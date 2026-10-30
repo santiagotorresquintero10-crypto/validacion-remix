@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>REMIX · Central Ganadera</title>
+  <meta name="description" content="Validación de clientes de planta, facturadores y proveedores contra la base maestra REMIX." />
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <!-- Pantalla de carga -->
+  <div id="view-loading" class="center-view">
+    <div class="spinner" aria-label="Cargando"></div>
+  </div>
+
+  <!-- Falta configuración -->
+  <div id="view-setup" class="center-view" hidden>
+    <div class="card narrow">
+      <h1 class="h2">Falta configurar Firebase</h1>
+      <p class="muted">Pegue la configuración de su proyecto en <code>public/js/firebase-config.js</code> y vuelva a publicar. Las instrucciones están en el README.</p>
+    </div>
+  </div>
+
+  <!-- Inicio de sesión -->
+  <div id="view-login" class="center-view login-bg" hidden>
+    <div class="login-shell">
+      <aside class="login-brand">
+        <img src="assets/logo-completo.png" alt="Central Ganadera S.A." class="login-logo" />
+        <div class="login-claim">
+          <div class="login-title">Validación REMIX</div>
+          <p>Verificación de clientes de planta, facturadores y proveedores contra la base maestra oficial.</p>
+        </div>
+      </aside>
+      <form id="login-form" class="login-form" novalidate>
+        <h1 class="h2">Iniciar sesión</h1>
+        <p class="muted">Ingrese con el usuario asignado.</p>
+        <label class="field">
+          <span>Correo</span>
+          <input type="email" id="login-email" autocomplete="username" required />
+        </label>
+        <label class="field">
+          <span>Contraseña</span>
+          <input type="password" id="login-password" autocomplete="current-password" required />
+        </label>
+        <p id="login-error" class="form-error" role="alert" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block" id="login-submit">Ingresar</button>
+        <button type="button" class="btn-link" id="login-reset">Olvidé mi contraseña</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Aplicación -->
+  <div id="view-app" hidden>
+    <div class="brandbar" aria-hidden="true"></div>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <span class="logo-wrap"><img src="assets/logo.png" alt="" class="logo" /><span class="logo-fallback">CG</span></span>
+          <div>
+            <div class="brand-name">Central Ganadera S.A.</div>
+            <div class="brand-sub">Validación REMIX</div>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <span class="chip chip-live" id="remix-chip" title="Versión activa de REMIX">REMIX —</span>
+          <span class="user" id="user-label"></span>
+          <button class="icon-btn" id="open-settings" title="Configuración de REMIX y equivalencias" aria-label="Configuración">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <button class="icon-btn" data-action="logout" title="Cerrar sesión" aria-label="Cerrar sesión">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <div id="no-remix" class="banner" hidden></div>
+
+      <!-- A. Validación manual -->
+      <section class="card" aria-labelledby="t-manual">
+        <div class="step"><span>1</span>Validación manual</div>
+        <h1 class="h2" id="t-manual">Validar información</h1>
+        <p class="muted">Compruebe los datos contra la base maestra REMIX. Mayúsculas, tildes y puntuación no afectan el resultado.</p>
+        <form id="manual-form" class="manual-grid" autocomplete="off">
+          <label class="field">
+            <span>Cliente de planta</span>
+            <input id="in-cliente" list="dl-cliente" placeholder="Ingrese cliente de planta…" />
+          </label>
+          <label class="field">
+            <span>Facturador</span>
+            <input id="in-facturador" list="dl-facturador" placeholder="Ingrese facturador…" />
+          </label>
+          <label class="field">
+            <span>Proveedor</span>
+            <input id="in-proveedor" list="dl-proveedor" placeholder="Ingrese proveedor…" />
+          </label>
+          <button type="submit" class="btn btn-primary btn-block" id="btn-validate">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            VALIDAR CONTRA REMIX
+          </button>
+        </form>
+        <datalist id="dl-cliente"></datalist>
+        <datalist id="dl-facturador"></datalist>
+        <datalist id="dl-proveedor"></datalist>
+
+        <hr class="sep" />
+
+        <!-- B. Carga de Excel -->
+        <div class="step"><span>2</span>Carga masiva</div>
+        <div class="section-head">
+          <h2 class="h3">Validación por Excel</h2>
+        </div>
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden />
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          <strong>Subir informe diario</strong>
+          <span class="muted small">Arrastre el archivo o haga clic para seleccionarlo (.xlsx)</span>
+          <span class="req-cols"><b>Cliente planta</b><b>Cliente factura</b><b>Proveedor</b></span>
+        </label>
+        <div id="file-preview" hidden>
+          <div class="preview-head">
+            <div>
+              <strong id="file-name"></strong>
+              <div class="muted small" id="file-meta"></div>
+            </div>
+            <div class="row-gap">
+              <button class="btn btn-ghost" id="btn-file-clear" type="button">Quitar</button>
+              <button class="btn btn-primary" id="btn-file-validate" type="button">VALIDAR ARCHIVO</button>
+            </div>
+          </div>
+          <div class="table-wrap preview-table"><table id="preview-table"></table></div>
+        </div>
+      </section>
+
+      <!-- C. Resultados -->
+      <section class="card" aria-labelledby="t-results" id="results-card">
+        <div class="step"><span>3</span>Resultados</div>
+        <div class="section-head">
+          <h2 class="h3" id="t-results">Resultados de validación</h2>
+          <span class="chip" id="results-chip">Sin validar</span>
+        </div>
+        <div id="summary" class="summary" hidden></div>
+        <div id="no-fact-remix" class="banner banner-sm" hidden>La columna <b>FACTURADOR (REMIX)</b> está vacía porque el REMIX activo se cargó sin la columna «Facturador». Vuelva a cargar el REMIX desde ⚙ → REMIX (una sola vez) y los resultados se actualizan solos.</div>
+        <div id="results-toolbar" class="toolbar" hidden>
+          <div class="filter-state">
+            <span id="filter-label"></span>
+            <button class="btn-link inline" id="btn-show-all" type="button" hidden>Ver todos</button>
+            <span class="cols-hint" title="Arrastre un encabezado de la tabla para cambiar el orden de las columnas. LOTE queda fija al inicio.">↔ Arrastre los encabezados para reordenar</span>
+            <button class="btn-link inline" id="btn-reset-cols" type="button" hidden>Restablecer columnas</button>
+          </div>
+          <div class="row-gap wrap">
+            <button class="btn btn-accent" id="btn-export" type="button"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg><span>EXPORTAR TODO A EXCEL</span></button>
+            <button class="btn btn-ghost" id="btn-clear-results" type="button">Limpiar</button>
+          </div>
+        </div>
+        <p class="muted" id="results-empty">Los resultados y las advertencias aparecerán aquí, con la opción de exportarlos a Excel.</p>
+        <div class="table-wrap" id="results-wrap" hidden>
+          <table class="results">
+            <thead id="results-head"></thead>
+            <tbody id="results-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <footer class="footer">
+      <span>© Central Ganadera S.A.</span>
+      <span id="footer-remix"></span>
+    </footer>
+  </div>
+
+  <!-- Configuración (administrador) -->
+  <dialog id="settings" class="modal">
+    <div class="modal-head">
+      <h2 class="h3">Configuración</h2>
+      <button class="icon-btn" id="close-settings" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="segmented" id="settings-tabs">
+      <button data-tab="remix" class="active">REMIX</button>
+      <button data-tab="equivalencias">Equivalencias</button>
+    </div>
+    <div class="modal-body">
+      <div data-panel="remix">
+        <div id="remix-current" class="info-box"></div>
+        <label class="dropzone compact">
+          <input type="file" id="remix-input" accept=".xlsx,.xls,.csv" hidden />
+          <strong>Cargar nueva versión de REMIX</strong>
+          <span class="muted small">Columnas usadas: Cliente de planta · Facturar a Nombre de · Proveedor.</span>
+          <span class="muted small">La versión actual se conserva y se puede reactivar.</span>
+        </label>
+        <div id="remix-review"></div>
+        <h3 class="h4">Versiones</h3>
+        <div id="remix-versions" class="list"></div>
+      </div>
+      <div data-panel="equivalencias" hidden>
+        <div id="eq-admin"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

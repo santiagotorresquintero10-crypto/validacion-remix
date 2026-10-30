@@ -1,0 +1,66 @@
+rules_version = '2';
+// Central Ganadera — REMIX Validación
+// Modelo: todos los usuarios con cuenta tienen los mismos permisos.
+// Nada se borra: REMIX se versiona y las equivalencias se revierten (trazabilidad).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    // ---------------- REMIX ----------------
+    match /config/remix {
+      allow read, write: if signedIn();
+    }
+    match /remixVersions/{versionId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+      // Solo se permite marcarla como completa; el resto no cambia.
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow delete: if false;
+      match /chunks/{chunkId} {
+        allow read: if signedIn();
+        allow create: if signedIn();
+        allow update, delete: if false; // una versión escrita es inmutable
+      }
+    }
+
+    // ---------------- Equivalencias ----------------
+    match /equivalences/{eqId} {
+      allow read: if signedIn();
+      function validDecision() {
+        return request.resource.data.field in ['cliente', 'facturador', 'proveedor']
+          && request.resource.data.status in ['aprobada', 'rechazada', 'revertida']
+          && request.resource.data.decidedBy == request.auth.uid;
+      }
+      allow create: if signedIn() && validDecision();
+      // Una decisión nueva, o solo la marca de vigencia frente a una versión de REMIX.
+      allow update: if signedIn() && (validDecision()
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['staleInVersion']));
+      allow delete: if false;
+    }
+
+    // ---------------- Historial de validaciones ----------------
+    match /validaciones/{id} {
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow read: if signedIn();
+      allow update, delete: if false;
+    }
+
+    // ---------------- Confirmaciones manuales («chulito») ----------------
+    match /confirmaciones/{id} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.active is bool
+        && request.resource.data.key is string
+        && request.resource.data.sig is string;
+      allow delete: if false; // se desmarca, no se borra (trazabilidad)
+    }
+
+    // Todo lo demás, cerrado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
